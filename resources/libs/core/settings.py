@@ -21,7 +21,6 @@ along with Spotimc.  If not, see <http://www.gnu.org/licenses/>.
 import xbmc
 import xbmcaddon
 import xbmcgui
-from __main__ import __addon_id__
 import xml.etree.ElementTree as ET
 
 
@@ -39,65 +38,6 @@ class StreamQuality:
 class StartupScreen:
     NewStuff = 0
     Playlists = 1
-
-
-class SettingsManager:
-    __addon = None
-
-    def __init__(self):
-        self.__addon = xbmcaddon.Addon(id=__addon_id__)
-
-    def _get_setting(self, name):
-        return self.__addon.getSetting(name)
-
-    def _set_setting(self, name, value):
-        return self.__addon.setSetting(name, value)
-
-    def get_addon_obj(self):
-        return self.__addon
-
-    def get_legal_warning_shown(self):
-        return self._get_setting('_legal_warning_shown') == 'true'
-
-    def set_legal_warning_shown(self, status):
-        if status:
-            str_status = 'true'
-        else:
-            str_status = 'false'
-
-        return self._set_setting('_legal_warning_shown', str_status)
-
-    def get_last_run_version(self):
-        return self._get_setting('_last_run_version')
-
-    def set_last_run_version(self, version):
-        return self._set_setting('_last_run_version', version)
-
-    def get_cache_status(self):
-        return self._get_setting('general_cache_enable') == 'true'
-
-    def get_cache_management(self):
-        return int(self._get_setting('general_cache_management'))
-
-    def get_cache_size(self):
-        return int(float(self._get_setting('general_cache_size')))
-
-    def get_audio_hide_unplayable(self):
-        return self._get_setting('audio_hide_unplayable') == 'true'
-
-    def get_audio_normalize(self):
-        return self._get_setting('audio_normalize') == 'true'
-
-    def get_audio_quality(self):
-        return int(self._get_setting('audio_quality'))
-
-    def get_misc_startup_screen(self):
-        return int(self._get_setting('misc_startup_screen'))
-
-    def show_dialog(self):
-        #Show the dialog
-        self.__addon.openSettings()
-
 
 class GuiSettingsReader:
     __guisettings_doc = None
@@ -152,3 +92,82 @@ class InfoValueManager:
         window = self._get_main_window()
         for item in self.__infolabels:
             window.clearProperty(item)
+
+
+## Esto apesta
+class SettingsManager:
+    __addon = None
+
+    def __init__(self, addon_id):
+
+        self.__addon_id__ = addon_id
+        self.__addon = xbmcaddon.Addon(self.__addon_id__)
+        self.__addon_path__ = self.__addon.getAddonInfo('path')
+        self.__addon_version__ = self.__addon.getAddonInfo('version')
+
+    def _get_setting(self, name):
+        return self.__addon.getSetting(name)
+
+    def _set_setting(self, name, value):
+        return self.__addon.setSetting(name, value)
+
+    def get_addon_obj(self):
+        return self.__addon
+
+    def get_legal_warning_shown(self):
+        return self._get_setting('_legal_warning_shown') == 'true'
+
+    def set_legal_warning_shown(self, status):
+        str_status = str(status)
+        return self._set_setting('_legal_warning_shown', str_status)
+
+    def get_last_run_version(self):
+        return self._get_setting('_last_run_version')
+
+    def set_last_run_version(self, version):
+        return self._set_setting('_last_run_version', version)
+
+    def get_cache_status(self):
+        return self._get_setting('general_cache_enable') == 'true'
+
+    def get_cache_management(self):
+        return int(self._get_setting('general_cache_management'))
+
+    def get_cache_size(self):
+        return int(float(self._get_setting('general_cache_size')))
+
+    def get_audio_hide_unplayable(self):
+        return self._get_setting('audio_hide_unplayable') == 'true'
+
+    def get_audio_normalize(self):
+        return self._get_setting('audio_normalize') == 'true'
+
+    def get_audio_quality(self):
+        return int(self._get_setting('audio_quality'))
+
+    def get_misc_startup_screen(self):
+        return int(self._get_setting('misc_startup_screen'))
+
+    def show_dialog(self):
+        #Show the dialog
+        self.__addon.openSettings()
+
+
+
+class VarManager:
+    __vars = None
+
+    def __init__(self):
+        self.__vars = {}
+
+    def set_var(self, name, value):
+        self.__vars[name] = value
+
+    def has_var(self, name):
+        return name in self.__vars
+
+    def get_var(self, name):
+        return self.__vars[name]
+
+    def remove_var(self, name):
+        del self.__vars[name]

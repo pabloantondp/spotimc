@@ -20,61 +20,71 @@ along with Spotimc.  If not, see <http://www.gnu.org/licenses/>.
 
 import xbmc
 import xbmcgui
-from spotimcgui.views import BaseListContainerView, iif
-from spotify import albumbrowse, session, track as _track, image
-from taskutils.decorators import run_in_thread
+from gui.views import BaseListContainerView, iif
+
+
+from spotify import TrackAvailability, ImageSize
+
+
+#from taskutils.decorators import run_in_thread
 import threading
 
+#
+# class AlbumCallbacks():
+#     def albumbrowse_complete(self, albumbrowse):
+#         xbmc.executebuiltin("Action(Noop)")
 
-class AlbumCallbacks(albumbrowse.AlbumbrowseCallbacks):
-    def albumbrowse_complete(self, albumbrowse):
-        xbmc.executebuiltin("Action(Noop)")
 
-
-class MetadataUpdateCallbacks(session.SessionCallbacks):
-
-    __event = None
-
-    def __init__(self, event):
-        self.__event = event
-
-    def metadata_updated(self, session):
-        self.__event.set()
+# class MetadataUpdateCallbacks(session._SessionCallbacks):
+#
+#     __event = None
+#
+#     def __init__(self, event):
+#         self.__event = event
+#
+#     def metadata_updated(self, session):
+#         self.__event.set()
 
 
 class AlbumTracksView(BaseListContainerView):
-    container_id = 1300
-    list_id = 1303
+    ID_CONTAINER = 1300
+    ID_LIST = 1303
 
-    context_menu_id = 5300
-    context_toggle_star = 5307
+    ID_CONTEXT_MENU = 5300
+    ID_CONTEXT_TOGGLE_STAR = 5307
 
     __albumbrowse = None
     __list_rendered = None
     __update_lock = None
     __update_unavailable = None
 
-    def __init__(self, session, album):
+    __album = None # A spotify.Album object
+    __xbmcSpotify = None
+
+    def __init__(self, xbmcSpotify, album):
+
         self.__list_rendered = False
         self.__update_lock = threading.Lock()
-        cb = AlbumCallbacks()
-        self.__albumbrowse = albumbrowse.Albumbrowse(session, album, cb)
+        self.__album = album
+        self.__xbmcSpotify = xbmcSpotify
+
+#         cb = AlbumCallbacks()
+#         self.__albumbrowse = albumbrowse.Albumbrowse(session, album, cb)
 
     def _play_selected_track(self, view_manager):
-        item = self.get_list(view_manager).getSelectedItem()
-        pos = int(item.getProperty("ListIndex"))
 
-        #If we have a valid index
-        if pos is not None:
-            session = view_manager.get_var('session')
-            playlist_manager = view_manager.get_var('playlist_manager')
-            playlist_manager.play(self.__albumbrowse.tracks(), session, pos)
+        # Get the ItemList object
+        item = self.get_list(view_manager).getSelectedItem()
+
+        # Play the item
+        self.__xbmcSpotify.play(item)
 
     def click(self, view_manager, control_id):
-        if control_id == AlbumTracksView.list_id:
+
+        if control_id == AlbumTracksView.ID_LIST:
             self._play_selected_track(view_manager)
 
-        elif control_id == AlbumTracksView.context_toggle_star:
+        elif control_id == AlbumTracksView.ID_CONTEXT_TOGGLE_STAR:
             item = self.get_list(view_manager).getSelectedItem()
             pos = int(item.getProperty("ListIndex"))
 
@@ -93,21 +103,20 @@ class AlbumTracksView(BaseListContainerView):
         #Run parent implementation's actions
         BaseListContainerView.action(self, view_manager, action_id)
 
-        playlist_manager = view_manager.get_var('playlist_manager')
-
         #Do nothing if playing, as it may result counterproductive
-        if not playlist_manager.is_playing():
-            if action_id == 79:
-                self._play_selected_track(view_manager)
+        if action_id == 79 and not self.__xbmcSpotify.is_playing():
+            print 'ACCIION QUE PODRIA INTERESAR'
+
+            #self._play_selected_track(view_manager)
 
     def get_container(self, view_manager):
-        return view_manager.get_window().getControl(AlbumTracksView.container_id)
+        return view_manager.get_window().getControl(AlbumTracksView.ID_CONTAINER)
 
     def get_list(self, view_manager):
-        return view_manager.get_window().getControl(AlbumTracksView.list_id)
+        return view_manager.get_window().getControl(AlbumTracksView.ID_LIST)
 
     def get_context_menu_id(self):
-        return AlbumTracksView.context_menu_id
+        return AlbumTracksView.ID_CONTEXT_MENU
 
     def _have_multiple_discs(self):
         for item in self.__albumbrowse.tracks():
@@ -117,14 +126,20 @@ class AlbumTracksView(BaseListContainerView):
         return False
 
     def _set_album_info(self, view_manager):
+        '''Set the information of the album into the view manager'''
+
         window = view_manager.get_window()
-        pm = view_manager.get_var('playlist_manager')
-        album = self.__albumbrowse.album()
-        artist = self.__albumbrowse.artist()
-        image_id = album.cover(image.ImageSize.Large)
-        window.setProperty("AlbumCover", pm.get_image_url(image_id))
-        window.setProperty("AlbumName", album.name())
-        window.setProperty("ArtistName", artist.name())
+        url = ''
+
+        try:
+            cover = self.__album.cover(image_size=ImageSize.LARGE)
+            url = self.__xbmcSpotify.get_image_url(cover)
+        except:
+            print 'album.py Can not get album cover url'
+
+        window.setProperty("AlbumCover", url)
+        window.setProperty("AlbumName", self.__album.name)
+        window.setProperty("ArtistName", self.__album.artist.name)
 
     def _add_disc_separator(self, list_obj, disc_number):
         item = xbmcgui.ListItem()
@@ -173,7 +188,7 @@ class AlbumTracksView(BaseListContainerView):
 
         return num_unavailable
 
-    @run_in_thread(max_concurrency=1)
+    #@run_in_thread(max_concurrency=1)
     def update_unavailable_tracks(self, view_manager):
 
         #Try acquiring the update lock
@@ -200,9 +215,17 @@ class AlbumTracksView(BaseListContainerView):
                 self.__update_lock.release()
 
     def render(self, view_manager):
-        if self.__albumbrowse.is_loaded():
-            session = view_manager.get_var('session')
-            pm = view_manager.get_var('playlist_manager')
+
+        if self.__album.is_loaded:
+
+            # Get the browser
+            album_browser = self.__album.browse()
+
+            try:
+                 album_browser.load(5)
+            except (Timeout) as ex:
+                raise Exception('Rendering album is not possible')
+
             has_unavailable = False
 
             #Reset list
@@ -213,27 +236,29 @@ class AlbumTracksView(BaseListContainerView):
             self._set_album_info(view_manager)
 
             #For disc grouping
-            last_disc = None
-            multiple_discs = self._have_multiple_discs()
+#             last_disc = None
+#             multiple_discs = self._have_multiple_discs()
+
 
             #Iterate over the track list
-            for list_index, track_obj in enumerate(self.__albumbrowse.tracks()):
+            for track in album_browser.tracks:
+
                 #If disc was changed add a separator
-                if multiple_discs and last_disc != track_obj.disc():
-                    last_disc = track_obj.disc()
-                    self._add_disc_separator(list_obj, last_disc)
+#                 if multiple_discs and last_disc != track_obj.disc():
+#                     last_disc = track_obj.disc()
+#                     self._add_disc_separator(list_obj, last_disc)
 
                 #Add the track item
-                url, info = pm.create_track_info(track_obj, session, list_index)
+                info = self.__xbmcSpotify.create_track_info(track)
                 list_obj.addItem(info)
 
                 #If the track is unavailable, add it to the list
-                track_available = track_obj.get_availability(session)
-                av_status = _track.TrackAvailability.Available
-                if track_available != av_status and not has_unavailable:
+                track_available = track.availability
+
+                if track_available != TrackAvailability.AVAILABLE  and not has_unavailable:
                     has_unavailable = True
 
-            self.update_unavailable_tracks(view_manager)
+#             self.update_unavailable_tracks(view_manager)
 
             self.__list_rendered = True
 

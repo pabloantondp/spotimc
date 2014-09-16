@@ -16,12 +16,14 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with Spotimc.  If not, see <http://www.gnu.org/licenses/>.
 '''
-
+import traceback
 
 import xbmc
 import xbmcgui
 import weakref
 from inspect import isfunction
+
+from threading import Timer
 
 
 def iif(cond, on_true, on_false):
@@ -38,11 +40,17 @@ def iif(cond, on_true, on_false):
 
 
 class ViewManager:
+
+    DOUBLE_CLICK_SPEED = 1
+
     __window = None
     __view_list = None
     __position = None
 
     __vars = None
+
+    __clicked = False
+    __timer = None
 
     def __init__(self, window):
         self.__window = weakref.proxy(window)
@@ -59,7 +67,7 @@ class ViewManager:
     def has_next(self):
         return(
             self.num_views() > 0
-            and self.position() < self.num_views() - 1
+            and self.__position < self.num_views() - 1
         )
 
     def _show_view(self, view):
@@ -106,8 +114,10 @@ class ViewManager:
         #Go to the next view
         self.next()
 
+
     def click(self, control_id):
         self.__view_list[self.__position].click(self, control_id)
+
 
     def action(self, action_id):
         self.__view_list[self.__position].action(self, action_id)
@@ -144,6 +154,9 @@ class BaseView:
     def click(self, view_manager, control_id):
         pass
 
+    def doubleClick(self, view_manager, control_id):
+        pass
+
     def action(self, view_manager, action_id):
         pass
 
@@ -174,15 +187,16 @@ class BaseContainerView(BaseView):
         return xbmc.getCondVisibility('Control.IsVisible(%d)' % container_id)
 
     def get_container(self, view_manager):
+        print 'Este get container lanza una exception'
         raise NotImplementedError()
-    
+
     def _set_focus_menu(self, view_manager):
         view_manager.get_window().setFocusId(200)
-    
+
     def _set_focus_container(self, view_manager):
         container = self.get_container(view_manager)
         view_manager.get_window().setFocus(container)
-    
+
     def set_focus(self, view_manager):
         #Focus the container if it's visible
         if self.is_visible(view_manager):
@@ -193,6 +207,8 @@ class BaseContainerView(BaseView):
             self._set_focus_menu(view_manager)
 
     def show(self, view_manager, set_focus=True):
+
+        # Call father implementation
         BaseView.show(self, view_manager, set_focus)
 
         #Hide container and show loading anim.
@@ -201,22 +217,22 @@ class BaseContainerView(BaseView):
 
         #If the view was rendered successfully
         if self.render(view_manager):
-            
+
             #Hide loading and show container
             view_manager.get_window().hide_loading()
             self.get_container(view_manager).setVisibleCondition('true')
-            
+
             #And focus if we were asked to do so
             if set_focus:
                 self._set_focus_container(view_manager)
-            
+
             return True
 
         #Container is still loading, so focus the menu instead
         elif set_focus:
             self._set_focus_menu(view_manager)
             return False
-    
+
     def hide(self, view_manager):
         BaseView.hide(self, view_manager)
 
@@ -246,10 +262,10 @@ class BaseListContainerView(BaseContainerView):
                 self.set_focus(view_manager)
 
     def show(self, view_manager, set_focus=True):
-        
+
         #Call the parent implementation and check if it was rendered
         if BaseContainerView.show(self, view_manager, set_focus):
-            
+
             window = view_manager.get_window()
 
             #Restore the list position, if we have one
@@ -269,14 +285,14 @@ class BaseListContainerView(BaseContainerView):
 
             else:
                 window.setProperty('ListWithNoItems', 'false')
-            
+
             return True
-        
+
         else:
             return False
-    
+
     def hide(self, view_manager):
-        
+
         #Store current list position
         list_obj = self.get_list(view_manager)
         self.__list_position = list_obj.getSelectedPosition()

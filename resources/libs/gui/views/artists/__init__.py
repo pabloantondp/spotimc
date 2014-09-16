@@ -17,15 +17,25 @@ You should have received a copy of the GNU General Public License
 along with Spotimc.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-import xbmc, time
+
+import xbmcgui
+import albums
 
 
+def choose_artist(artist_list):
+    if len(artist_list) > 1:
+        d = xbmcgui.Dialog()
+        artist_names = [artist.name() for artist in artist_list]
+        result = d.select('Choose an artist', artist_names)
+        if result != -1:
+            return artist_list[result]
 
-def show_busy_dialog():
-    xbmc.executebuiltin('ActivateWindow(busydialog)')
+    else:
+        return artist_list[0]
 
 
-def hide_busy_dialog():
-    xbmc.executebuiltin('Dialog.Close(busydialog)')
-    while xbmc.getCondVisibility('Window.IsActive(busydialog)'):
-        time.sleep(.1)
+def open_artistbrowse_albums(view_manager, xbmcSpotify, artist_list):
+    artist = choose_artist(artist_list)
+    if artist is not None:
+        v = albums.ArtistAlbumsView(xbmcSpotify, artist)
+        view_manager.add_view(v)

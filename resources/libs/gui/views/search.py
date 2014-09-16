@@ -19,10 +19,10 @@ along with Spotimc.  If not, see <http://www.gnu.org/licenses/>.
 
 
 import xbmc
-from spotimcgui.views import BaseListContainerView
+from gui.views import BaseListContainerView
 from spotify import search, track
-from spotimcgui.views.artists import open_artistbrowse_albums
-from spotimcgui.views.album import AlbumTracksView
+from gui.views.artists import open_artistbrowse_albums
+from gui.views.album import AlbumTracksView
 
 
 def ask_search_term():
@@ -33,19 +33,19 @@ def ask_search_term():
         return kb.getText()
 
 
-class SearchTracksCallbacks(search.SearchCallbacks):
+class SearchTracksCallbacks():
     def search_complete(self, result):
         xbmc.executebuiltin("Action(Noop)")
 
 
 class SearchTracksView(BaseListContainerView):
-    container_id = 1500
-    list_id = 1520
+    ID_CONTAINER = 1500
+    ID_LIST = 1520
 
     button_did_you_mean = 1504
     button_new_search = 1510
 
-    context_menu_id = 5500
+    ID_CONTEXT_MENU = 5500
     context_browse_artist_button = 5502
     context_browse_album_button = 5503
     context_toggle_star = 5504
@@ -94,7 +94,7 @@ class SearchTracksView(BaseListContainerView):
                 self._do_search(term)
                 view_manager.show()
 
-        elif control_id == SearchTracksView.list_id:
+        elif control_id == SearchTracksView.ID_LIST:
             self._play_selected_track(view_manager)
 
         elif control_id == SearchTracksView.context_browse_artist_button:
@@ -124,21 +124,19 @@ class SearchTracksView(BaseListContainerView):
         #Run parent implementation's actions
         BaseListContainerView.action(self, view_manager, action_id)
 
-        playlist_manager = view_manager.get_var('playlist_manager')
-
         #Do nothing if playing, as it may result counterproductive
-        if not playlist_manager.is_playing():
-            if action_id == 79:
-                self._play_selected_track(view_manager)
+        if action_id == 79 and not playlist_manager.is_playing():
+            print 'ACCIION QUE PODRIA INTERESAR'
+            #self._play_selected_track(view_manager)
 
     def get_container(self, view_manager):
-        return view_manager.get_window().getControl(SearchTracksView.container_id)
+        return view_manager.get_window().getControl(SearchTracksView.ID_CONTAINER)
 
     def get_list(self, view_manager):
-        return view_manager.get_window().getControl(SearchTracksView.list_id)
+        return view_manager.get_window().getControl(SearchTracksView.ID_LIST)
 
     def get_context_menu_id(self):
-        return SearchTracksView.context_menu_id
+        return SearchTracksView.ID_CONTEXT_MENU
 
     def _set_search_info(self, view_manager):
         window = view_manager.get_window()

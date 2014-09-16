@@ -20,13 +20,13 @@ along with Spotimc.  If not, see <http://www.gnu.org/licenses/>.
 
 import xbmcgui
 from spotify import Bitrate
-from spotimcgui.views import BaseListContainerView
-from spotimcgui.settings import SettingsManager, CacheManagement, StreamQuality
+from gui.views import BaseListContainerView
+from core.settings import CacheManagement, StreamQuality
 
 
 class MoreView(BaseListContainerView):
-    container_id = 1900
-    list_id = 1901
+    ID_CONTAINER = 1900
+    ID_LIST = 1901
 
     def _do_logout(self, view_manager):
         #Ask the user first
@@ -43,6 +43,7 @@ class MoreView(BaseListContainerView):
             view_manager.get_window().close()
 
     def _do_settings(self, view_manager):
+
         settings = SettingsManager()
         session = view_manager.get_var('session')
 
@@ -104,14 +105,14 @@ class MoreView(BaseListContainerView):
                 self._do_logout(view_manager)
 
     def click(self, view_manager, control_id):
-        if control_id == MoreView.list_id:
+        if control_id == MoreView.ID_LIST:
             self._handle_list_click(view_manager)
 
     def get_container(self, view_manager):
-        return view_manager.get_window().getControl(MoreView.container_id)
+        return view_manager.get_window().getControl(MoreView.ID_CONTAINER)
 
     def get_list(self, view_manager):
-        return view_manager.get_window().getControl(MoreView.list_id)
+        return view_manager.get_window().getControl(MoreView.ID_LIST)
 
     def _add_item(self, list_obj, key, label, icon):
         list_obj.addItem(

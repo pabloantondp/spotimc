@@ -17,27 +17,43 @@ You should have received a copy of the GNU General Public License
 along with Spotimc.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from __main__ import __addon_path__
+from __main__ import addon_info
 import sys
 import os.path
 import platform
 import xbmc
-
+from core.settings import GuiSettingsReader
 
 def set_library_paths():
     #Set local library paths
-    libs_dir = os.path.join(__addon_path__, "resources/libs")
+    libs_dir = os.path.join(addon_info.__addon_path__, "resources/libs")
     sys.path.insert(0, libs_dir)
-    sys.path.insert(0, os.path.join(libs_dir, "xbmc-skinutils/src"))
-    sys.path.insert(0, os.path.join(libs_dir, "cherrypy"))
-    sys.path.insert(0, os.path.join(libs_dir, "taskutils/src"))
-    sys.path.insert(0, os.path.join(libs_dir, "pyspotify-ctypes/src"))
-    sys.path.insert(0, os.path.join(libs_dir, "pyspotify-ctypes-proxy/src"))
+#     sys.path.insert(0, os.path.join(libs_dir, "xbmc-skinutils/src"))
+#     sys.path.insert(0, os.path.join(libs_dir, "cherrypy"))
+#     sys.path.insert(0, os.path.join(libs_dir, "taskutils/src"))
+#     sys.path.insert(0, os.path.join(libs_dir, "pyspotify-ctypes/src"))
+#     sys.path.insert(0, os.path.join(libs_dir, "pyspotify-ctypes-proxy/src"))
 
 
 def has_background_support():
     return True
 
+def get_audio_buffer_size():
+    #Base buffer setting will be 10s
+    buffer_size = 10
+
+    try:
+        reader = GuiSettingsReader()
+        value = reader.get_setting('settings.musicplayer.crossfade')
+        buffer_size += int(value)
+
+    except:
+        xbmc.log(
+            'Failed reading crossfade setting. Using default value.',
+            xbmc.LOGERROR
+        )
+
+    return buffer_size
 
 def get_architecture():
     try:

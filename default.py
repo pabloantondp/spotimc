@@ -1,59 +1,83 @@
 '''
 Copyright 2011 Mikel Azkolain
+Copyright 2014 Pablo Anton
 
-This file is part of Spotimc.
+This file is part of XbmcSpotify (Forked from spotimc).
 
-Spotimc is free software: you can redistribute it and/or modify
+XbmcSpotify is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-Spotimc is distributed in the hope that it will be useful,
+XbmcSpotify is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Spotimc.  If not, see <http://www.gnu.org/licenses/>.
+along with XbmcSpotify.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-
-import xbmc
+# XBMC imports
 import xbmcaddon
-import os.path
+import xbmcgui
+from xbmc import log
+
 import sys
-
-#Set global addon information first
-__addon_id__ = 'script.audio.spotimc'
-addon_cfg = xbmcaddon.Addon(__addon_id__)
-__addon_path__ = addon_cfg.getAddonInfo('path')
-__addon_version__ = addon_cfg.getAddonInfo('version')
-
-#Make spotimcgui available
-sys.path.insert(0, os.path.join(__addon_path__, "resources/libs"))
-from spotimcgui.utils import environment
+import os
+import traceback # For exception control
+import gc
 
 
-if environment.has_background_support():
+class addon_info:
+    __addon_id__        = 'script.audio.xbmcSpotify'
+    __addon__           = xbmcaddon.Addon(__addon_id__)
+    __addon_path__      = __addon__.getAddonInfo('path')
+    __addon_version__   = __addon__.getAddonInfo('version')
 
-    #Some specific imports for this condition
-    from spotimcgui.settings import InfoValueManager
-    from spotimcgui.utils.gui import show_busy_dialog
 
-    manager = InfoValueManager()
-    spotimc_window_id = manager.get_infolabel('spotimc_window_id')
 
-    if spotimc_window_id != '':
-        xbmc.executebuiltin('ActivateWindow(%s)' % spotimc_window_id)
-    else:
-        spotimc_path = os.path.join(__addon_path__, 'spotimc.py')
-        show_busy_dialog()
-        xbmc.executebuiltin('RunScript("%s")' % spotimc_path)
+xbmc.log(msg='Create script.audio.xbmcSpotify v.' + addon_info.__addon_version__ +  ' addon.' + '' , level=xbmc.LOGNOTICE)
 
-else:
-    #Prepare the environment...
-    from spotimcgui.utils.environment import set_library_paths
-    set_library_paths()
+# Adding spotimcgui libraries
+sys.path.insert(0, os.path.join(addon_info.__addon_path__, "resources/libs"))
 
-    from spotimcgui.main import main
-    main()
+
+# When main is imported twice there is a error on cffi/vengine_cpy.py
+from core.main import main
+from core.xbmcSpotify import XbmcSpotify
+
+xbmcSpotify = None
+
+# Try to read spotify_appkey.key
+try:
+
+    xbmcSpotify = XbmcSpotify()
+
+    xbmc.log(msg='Created XBMCSpotify object', level=xbmc.LOGNOTICE)
+
+    main(xbmcSpotify)
+
+except (Exception) as ex:
+
+    # TODO Inform about the exception
+    dlg = xbmcgui.Dialog()
+    dlg.ok(ex.__class__.__name__, str(ex))
+    print 'default exception'
+finally:
+
+#     # Logout if neccesary
+#     if (session.connection.state == ConnectionState.LOGGED_IN):
+#         session.logout()
+#         xbmc.log(msg='script.audio.xbmcSpotify logout ' , level=xbmc.LOGNOTICE)
+
+    gc.enable()
+    gc.collect()
+
+    if xbmcSpotify is not None:
+        xbmcSpotify.release()
+
+    addon_info.__addon__ = None
+    xbmc.log(msg='script.audio.xbmcSpotify Exit ' , level=xbmc.LOGNOTICE)
+
+

@@ -18,68 +18,121 @@ along with Spotimc.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
 
-import loaders
-from spotimcgui.views import BaseListContainerView, iif
-from spotify import track
-from spotimcgui.views.album import AlbumTracksView
-from spotimcgui.views.artists import open_artistbrowse_albums
-from spotimcgui.settings import SettingsManager
+import xbmcgui
+from gui.views import BaseListContainerView, iif
+from gui.views.album import AlbumTracksView
+from gui.views.artists import open_artistbrowse_albums
+
+from spotify import ErrorType
+from spotify import TrackAvailability
+from spotify import Timeout
+
+import threading
+from utils.tasks.decorators import run_async
 
 
 class PlaylistDetailView(BaseListContainerView):
-    container_id = 1800
-    list_id = 1801
+    ID_CONTAINER = 1800
+    ID_LIST = 1801
 
-    BrowseArtistButton = 5811
-    BrowseAlbumButton = 5812
+    ID_BROWSER_ARTIST = 5811
+    ID_BROWSE_ALBUM = 5812
 
-    context_menu_id = 5800
-    context_toggle_star = 5813
+    ID_CONTEXT_MENU = 5800
+    ID_CONTEXT_TOGGLE_STAR = 5813
 
-    __loader = None
     __playlist = None
+    __xbmcSpotify = None
 
-    def __init__(self, session, playlist, playlist_manager):
-        self.__playlist = playlist
-        self.__loader = loaders.FullPlaylistLoader(
-            session, playlist, playlist_manager
-        )
+    def __init__(self, xbmcSpotify, playlist):
 
-    def _set_loader(self, loader):
-        self.__loader = loader
+        try:
+            if not playlist.is_loaded:
+                playlist.load(10)
 
-    def _set_playlist(self, playlist):
-        self.__playlist = playlist
+            self.__playlist = playlist
+            self.__xbmcSpotify = xbmcSpotify
+
+        except (Timeout) as ex:
+            print 'No se ha podido leer playlist '
 
     def _browse_artist(self, view_manager):
         item = self.get_list(view_manager).getSelectedItem()
-        pos = int(item.getProperty('ListIndex'))
-        track_obj = self.__loader.get_track(pos)
-        artist_list = [artist for artist in track_obj.artists()]
-        open_artistbrowse_albums(view_manager, artist_list)
+        track_obj = self.__xbmcSpotify.get_track(item)
+        open_artistbrowse_albums(view_manager, self.__xbmcSpotify, track_obj.artists)
+
+    def _browse_album(self, view_manager):
+        item = self.get_list(view_manager).getSelectedItem()
+        album = self.__xbmcSpotify.get_album(item)
+        v = AlbumTracksView(self.__xbmcSpotify, album)
+        view_manager.add_view(v)
 
     def _play_selected_track(self, view_manager):
-        session = view_manager.get_var('session')
-        item = self.get_list(view_manager).getSelectedItem()
-        pos = int(item.getProperty('ListIndex'))
-        playlist_manager = view_manager.get_var('playlist_manager')
-        playlist_manager.play(self.__loader.get_tracks(), session, pos)
 
-    def click(self, view_manager, control_id):
-        if control_id == PlaylistDetailView.list_id:
+        # Get the ItemList object
+        item = self.get_list(view_manager).getSelectedItem()
+
+        # Get the list index property to get the track object
+#         pos = int(item.getProperty('ListIndex'))
+
+        self.__xbmcSpotify.add_play(item)
+
+    def _queue_selected_track(self, view_manager):
+        print 'details.py _queue_selected_track'
+
+    def doubleClick(self, view_manager, control_id):
+
+        print 'Bien estamos en el doubleclick de datail.py'
+
+        if control_id == PlaylistDetailView.ID_LIST:
+            # Playing a track of the showed playlist
             self._play_selected_track(view_manager)
 
-        elif control_id == PlaylistDetailView.BrowseArtistButton:
+        else:
+            # Others commands are treated as one click
+            self.click(view_manager, control_id)
+
+    @run_async
+    def click(self, view_manager, control_id):
+
+#          try :
+#             if self.__clicked:
+#                 self.__timer.cancel()
+#                 print 'Double click stop timer and call double click'
+#                 self.__timer.cancel()
+#                 self.__view_list[self.__position].doubleClick(self, control_id)
+#                 self.__clicked = False
+#             else:
+#                 self.__clicked = True
+#                 view = self.__view_list[self.__position]
+#                 self.__timer = Timer(ViewManager.DOUBLE_CLICK_SPEED,
+#                                      view.click,
+#                                      [self, control_id])
+#                 self.__timer.start()
+#                 print 'Before the join ....'
+#                 self.__timer.join()
+#                 self.__clicked = False
+#                 print 'After the join ....'
+#
+#         except:
+#             traceback.print_exc()
+#             self.__clicked = False
+
+
+        if control_id == PlaylistDetailView.ID_LIST:
+            # Playing a track of the showed playlist
+            self._queue_selected_track(view_manager)
+
+        elif control_id == PlaylistDetailView.ID_BROWSER_ARTIST:
+            # Browser the specific artist
             self._browse_artist(view_manager)
 
-        elif control_id == PlaylistDetailView.BrowseAlbumButton:
-            item = self.get_list(view_manager).getSelectedItem()
-            pos = int(item.getProperty('ListIndex'))
-            album = self.__loader.get_track(pos).album()
-            v = AlbumTracksView(view_manager.get_var('session'), album)
-            view_manager.add_view(v)
+        elif control_id == PlaylistDetailView.ID_BROWSE_ALBUM:
 
-        elif control_id == PlaylistDetailView.context_toggle_star:
+            # Browse the specific album of the artist
+            self._browse_album(view_manager)
+
+        elif control_id == PlaylistDetailView.ID_CONTEXT_TOGGLE_STAR:
             item = self.get_list(view_manager).getSelectedItem()
             pos = int(item.getProperty("ListIndex"))
 
@@ -98,22 +151,20 @@ class PlaylistDetailView(BaseListContainerView):
         #Run parent implementation's actions
         BaseListContainerView.action(self, view_manager, action_id)
 
-        playlist_manager = view_manager.get_var('playlist_manager')
-
         #Do nothing if playing, as it may result counterproductive
-        if not playlist_manager.is_playing():
-            if action_id == 79:
-                self._play_selected_track(view_manager)
+        if action_id == 79 and not self.__xbmcSpotify.is_playing():
+            print 'ACCIION QUE PODRIA INTERESAR'
+            #self._play_selected_track(view_manager)
 
     def get_container(self, view_manager):
         return view_manager.get_window().getControl(
-            PlaylistDetailView.container_id)
+            PlaylistDetailView.ID_CONTAINER)
 
     def get_list(self, view_manager):
-        return view_manager.get_window().getControl(PlaylistDetailView.list_id)
+        return view_manager.get_window().getControl(PlaylistDetailView.ID_LIST)
 
     def get_context_menu_id(self):
-        return PlaylistDetailView.context_menu_id
+        return PlaylistDetailView.ID_CONTEXT_MENU
 
     def _get_playlist_length_str(self):
         total_duration = 0
@@ -148,15 +199,15 @@ class PlaylistDetailView(BaseListContainerView):
                 return '%d minutes' % num_minutes
 
     def _set_playlist_properties(self, view_manager):
+
         window = view_manager.get_window()
 
         #Playlist name
-        window.setProperty("PlaylistDetailName", self.__loader.get_name())
+        window.setProperty("PlaylistDetailName", self.__playlist.name)
 
         #Owner info
-        session = view_manager.get_var('session')
-        current_username = session.user().canonical_name()
-        playlist_username = self.__playlist.owner().canonical_name()
+        current_username = self.__xbmcSpotify.get_user_name()
+        playlist_username = self.__playlist.owner.canonical_name
         show_owner = current_username != playlist_username
         window.setProperty("PlaylistDetailShowOwner",
                            iif(show_owner, "true", "false"))
@@ -164,21 +215,22 @@ class PlaylistDetailView(BaseListContainerView):
             window.setProperty("PlaylistDetailOwner", str(playlist_username))
 
         #Collaboratie status
-        is_collaborative_str = iif(self.__playlist.is_collaborative(),
+        is_collaborative_str = iif(self.__playlist.collaborative,
                                    "true", "false")
         window.setProperty("PlaylistDetailCollaborative", is_collaborative_str)
 
         #Length data
         window.setProperty("PlaylistDetailNumTracks",
-                           str(self.__playlist.num_tracks()))
-        window.setProperty("PlaylistDetailDuration",
-                           self._get_playlist_length_str())
+                           str(len(self.__playlist.tracks)))
+#         window.setProperty("PlaylistDetailDuration",
+#                            self._get_playlist_length_str())
 
         #Subscribers
         window.setProperty("PlaylistDetailNumSubscribers",
-                           str(self.__playlist.num_subscribers()))
+                           str(self.__playlist.subscribers))
 
     def _set_playlist_image(self, view_manager, thumbnails):
+
         if len(thumbnails) > 0:
             window = view_manager.get_window()
 
@@ -196,16 +248,18 @@ class PlaylistDetailView(BaseListContainerView):
                 prop = "PlaylistDetailCoverItem{0:d}IsRemote".format(item_num)
                 window.setProperty(prop, is_remote_str)
 
+
+
+
     def render(self, view_manager):
-        if self.__loader.is_loaded():
-            session = view_manager.get_var('session')
-            pm = view_manager.get_var('playlist_manager')
+
+        if self.__playlist is not None:
+
             list_obj = self.get_list(view_manager)
-            sm = SettingsManager()
 
             #Set the thumbnails
-            self._set_playlist_image(view_manager,
-                                     self.__loader.get_thumbnails())
+            #self._set_playlist_image(view_manager,
+            #                          self.__loader.get_thumbnails())
 
             #And the properties
             self._set_playlist_properties(view_manager)
@@ -214,21 +268,24 @@ class PlaylistDetailView(BaseListContainerView):
             list_obj.reset()
 
             #Draw the items on the list
-            for list_index, track_obj in enumerate(self.__loader.get_tracks()):
-                show_track = (
-                    track_obj.is_loaded() and
-                    track_obj.error() == 0 and
-                    (
-                        (track_obj.get_availability(session) ==
-                            track.TrackAvailability.Available) or
-                        not sm.get_audio_hide_unplayable()
-                    )
-                )
+            for track in self.__playlist.tracks:
 
-                if show_track:
-                    url, info = pm.create_track_info(track_obj, session,
-                                                     list_index)
-                    list_obj.addItem(info)
+                try:
+
+                    if not track.is_loaded:
+                        track.load(5)
+
+                    if (track.error == ErrorType.OK and
+                        track.availability == TrackAvailability.AVAILABLE):
+
+                        info = self.__xbmcSpotify.create_track_info(track)
+
+                        if info is not None:
+                            list_obj.addItem(info)
+
+
+                except (Timeout ) as ex:
+                    print 'Detail.py render, fail to load track ' + str(track.error)
 
             return True
 

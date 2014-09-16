@@ -17,15 +17,13 @@ You should have received a copy of the GNU General Public License
 along with Spotimc.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
+import xbmc, time
 
-"""
-You must provide a key issued by Spotify:
-https://developer.spotify.com/technologies/libspotify/keys/
+def show_busy_dialog():
+    xbmc.executebuiltin('ActivateWindow(busydialog)')
 
-Once you get the key, export it as "C-Code" and paste just the hex data.
 
-Example:
-
-appkey = [0x01, 0x02, 0x03, ... ]
-"""
-appkey = []
+def hide_busy_dialog():
+    xbmc.executebuiltin('Dialog.Close(busydialog)')
+    while xbmc.getCondVisibility('Window.IsActive(busydialog)'):
+        time.sleep(.1)

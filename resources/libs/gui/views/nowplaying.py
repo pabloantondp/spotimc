@@ -19,16 +19,16 @@ along with Spotimc.  If not, see <http://www.gnu.org/licenses/>.
 
 
 import xbmc
-from spotimcgui.views import BaseContainerView
-from spotimcgui.views.artists import open_artistbrowse_albums
-from spotimcgui.views.album import AlbumTracksView
+from gui.views import BaseContainerView
+from gui.views.artists import open_artistbrowse_albums
+from gui.views.album import AlbumTracksView
 
 
 class PlayerCallbacks(xbmc.Player):
     def onPlayBackStopped(self):
         xbmc.executebuiltin('SetFocus(212)')
-    
-    
+
+
     def onPlayBackEnded(self):
         pl = xbmc.PlayList(xbmc.PLAYLIST_MUSIC)
         if pl.getposition() < 0:
@@ -36,11 +36,11 @@ class PlayerCallbacks(xbmc.Player):
 
 
 class NowPlayingView(BaseContainerView):
-    container_id = 1600
+    ID_CONTAINER = 1600
 
     browse_artist_button = 1621
     browse_album_button = 1622
-    
+
     __player_callbacks = None
 
     def _get_current_track(self, view_manager):
@@ -67,12 +67,12 @@ class NowPlayingView(BaseContainerView):
             self._do_browse_album(view_manager)
 
     def get_container(self, view_manager):
-        return view_manager.get_window().getControl(NowPlayingView.container_id)
-    
+        return view_manager.get_window().getControl(NowPlayingView.ID_CONTAINER)
+
     def show(self, view_manager, set_focus=True):
         self.__player_callbacks = PlayerCallbacks()
         return BaseContainerView.show(self, view_manager, set_focus=True)
-    
+
     def hide(self, view_manager):
         self.__player_callbacks = None
         BaseContainerView.hide(self, view_manager)

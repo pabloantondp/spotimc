@@ -21,12 +21,9 @@ along with Spotimc.  If not, see <http://www.gnu.org/licenses/>.
 import xbmc
 import xbmcgui
 import time
-from spotify.session import SessionCallbacks
-from spotify import ErrorType
-from __main__ import __addon_path__
 
 
-class LoginCallbacks(SessionCallbacks):
+class LoginCallbacks():
     __dialog = None
 
     def __init__(self, dialog):
@@ -41,61 +38,66 @@ class LoginCallbacks(SessionCallbacks):
 
 
 class LoginWindow(xbmcgui.WindowXMLDialog):
+
     #Controld id's
-    username_input = 1101
-    password_input = 1102
-    login_button = 1104
-    cancel_button = 1105
+    CODE_INPUT_USERNAME = 1101
+    CODE_INPUT_PASS = 1102
+    CODE_LOGIN_BUTTON = 1104
+    CODE_CANCEL_BUTTON = 1105
 
-    login_container = 1000
-    fields_container = 1100
-    loading_container = 1200
+    ID_LOGIN_CONTAINER = 1000
+    ID_FIELDS_CONTAINER = 1100
+    ID_LOADING_CONTAINER = 1200
 
+    __xbmcSpotify = None
     __file = None
-    __script_path = None
     __skin_dir = None
-    __session = None
     __callbacks = None
-    __app = None
+    __vars = None
 
     __username = None
     __password = None
 
     __cancelled = None
 
-    def __init__(self, file, script_path, skin_dir):
+    def __init__(self, file, scriptPath, skin_dir ):
         self.__file = file
-        self.__script_path = script_path
         self.__skin_dir = skin_dir
         self.__cancelled = False
 
-    def initialize(self, session, app):
-        self.__session = session
-        self.__callbacks = LoginCallbacks(self)
-        self.__session.add_callbacks(self.__callbacks)
-        self.__app = app
+
+    def initialize(self, xbmcSpotify, vars):
+        self.__xbmcSpotify = xbmcSpotify
+        self.__vars = vars
+ #         self.__callbacks = LoginCallbacks(self)
+#         self.__session.add_callbacks(self.__callbacks)
 
     def onInit(self):
+
         #If there is a remembered user, show it's login name
-        username = self.__session.remembered_user()
+        username = self.__xbmcSpotify.get_user_name()
+
         if username is not None:
-            self._set_input_value(self.username_input, username)
+            self._set_input_value(self.CODE_INPUT_USERNAME, username)
 
         #Show useful info if previous errors are present
-        if self.__app.has_var('login_last_error'):
+        if self.__vars.has_var('login_last_error'):
 
             #If the error number was relevant...
-            login_last_error = self.__app.get_var('login_last_error')
+            login_last_error = self.__vars.get_var('login_last_error')
             if login_last_error != 0:
                 #Wait for the appear animation to complete
                 time.sleep(0.2)
 
-                self.set_error(self.__app.get_var('login_last_error'), True)
+                self.set_error(self.__vars.get_var('login_last_error'), True)
 
     def onAction(self, action):
-        if action.getId() in [9, 10, 92]:
-            self.__cancelled = True
-            self.do_close()
+        pass
+#
+#         print action.getId()
+#         if action.getId() in [9, 10, 92]:
+#             self.__cancelled = True
+#             self.do_close()
 
     def set_error(self, code, short_animation=False):
         messages = {
@@ -129,60 +131,75 @@ class LoginWindow(xbmcgui.WindowXMLDialog):
 
         #Hide animation
         self.getControl(
-            LoginWindow.loading_container).setVisibleCondition('false')
+            LoginWindow.ID_LOADING_CONTAINER).setVisibleCondition('false')
 
-    def _get_input_value(self, controlID):
+    def __get_input_value(self, controlID):
         c = self.getControl(controlID)
         return c.getLabel()
 
-    def _set_input_value(self, controlID, value):
+    def __set_input_value(self, controlID, value):
         c = self.getControl(controlID)
         c.setLabel(value)
 
     def do_login(self):
+        '''Make the login into spotify'''
+        # Get the value of the remember field
         remember_set = xbmc.getCondVisibility(
             'Skin.HasSetting(spotimc_session_remember)'
         )
-        self.__session.login(self.__username, self.__password, remember_set)
-
-        #Clear error status
-        xbmc.executebuiltin('SetProperty(IsLoginError,false)')
 
         #SHow loading animation
         self.getControl(
-            LoginWindow.loading_container).setVisibleCondition('true')
+            LoginWindow.ID_LOADING_CONTAINER).setVisibleCondition('true')
+
+        status = self.__xbmcSpotify.login(self.__username,
+                                          self.__password,
+                                          remember_set == 1)
+
+        #Unshow loading animation
+        self.getControl(
+            LoginWindow.ID_LOADING_CONTAINER).setVisibleCondition('false')
+
+        # Return the error status
+        return status
 
     def do_close(self):
-        self.__session.remove_callbacks(self.__callbacks)
-        c = self.getControl(LoginWindow.login_container)
+        c = self.getControl(LoginWindow.ID_LOGIN_CONTAINER)
         c.setVisibleCondition("False")
-        time.sleep(0.2)
         self.close()
 
+
     def onClick(self, controlID):
-        if controlID == self.username_input:
-            default = self._get_input_value(controlID)
+        '''Handler function for Login windows'''
+        if controlID == self.CODE_INPUT_USERNAME:
+            default = self.__get_input_value(controlID)
             kb = xbmc.Keyboard(default, "Enter username")
             kb.setHiddenInput(False)
             kb.doModal()
             if kb.isConfirmed():
                 value = kb.getText()
                 self.__username = value
-                self._set_input_value(controlID, value)
+                self.__set_input_value(controlID, value)
 
-        elif controlID == self.password_input:
+        elif controlID == self.CODE_INPUT_PASS:
             kb = xbmc.Keyboard("", "Enter password")
             kb.setHiddenInput(True)
             kb.doModal()
             if kb.isConfirmed():
                 value = kb.getText()
                 self.__password = value
-                self._set_input_value(controlID, "*" * len(value))
+                self.__set_input_value(controlID, "*" * len(value))
 
-        elif controlID == self.login_button:
-            self.do_login()
+        elif controlID == self.CODE_LOGIN_BUTTON:
+            status = self.do_login()
 
-        elif controlID == self.cancel_button:
+            # Check the status to proceed
+            if (status != 0):
+                #Clear error status
+                xbmc.executebuiltin('SetProperty(IsLoginError,false)')
+                self.do_close()
+
+        elif controlID == self.CODE_CANCEL_BUTTON:
             self.__cancelled = True
             self.do_close()
 
